@@ -118,10 +118,10 @@ st.markdown(
     """
 <style>
     .metric-card {
-        background-color: var(--secondary-background-color, #1e1e2f);
+        background-color: rgba(128, 128, 128, 0.1);
+        border: 1px solid rgba(128, 128, 128, 0.2);
         padding: 18px 16px;
         border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         text-align: center;
         margin-bottom: 20px;
         height: 140px;
@@ -144,7 +144,7 @@ st.markdown(
     .metric-detail {
         font-size: 0.85rem;
         font-weight: 500;
-        color: var(--text-color, #c0c0d0);
+        color: inherit;
         opacity: 0.7;
         max-width: 100%;
         overflow: hidden;
@@ -153,7 +153,7 @@ st.markdown(
     }
     .metric-label {
         font-size: 0.8rem;
-        color: var(--text-color, #707088);
+        color: inherit;
         opacity: 0.5;
         margin-top: 2px;
     }

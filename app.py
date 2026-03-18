@@ -370,7 +370,7 @@ function (row) {
     FastMarkerCluster(data=cluster_data, callback=callback).add_to(m)
 
     # Render as static HTML — much faster than st_folium on reruns
-    st_html(m._repr_html_(), height=520)
+    st_html(m._repr_html_(), height=650)
 else:
     st.info(t("map_no_data"))
 

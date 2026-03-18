@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-@st.cache_data(ttl=3600)  # Cache DB fetch in Streamlit
+@st.cache_data(ttl=1800)  # Cache DB fetch for 30 minutes
 def fetch_raw_data():
     conn = st.connection("postgresql", type="sql")
     query = """

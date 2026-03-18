@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import folium
-from streamlit_folium import st_folium
+from folium.plugins import FastMarkerCluster
+from streamlit.components.v1 import html as st_html
 from data import get_processed_data
 
 
@@ -331,25 +332,40 @@ if not map_data.empty:
         electricity_count=("kind", lambda x: (x == "Electricity").sum()),
         water_count=("kind", lambda x: (x == "Water").sum()),
     ).reset_index()
-    for idx, row in grouped.iterrows():
-        color = "red" if row["electricity_count"] >= row["water_count"] else "blue"
-        last_event_str = row["last_event"].strftime('%Y-%m-%d %H:%M:%S') if pd.notna(row["last_event"]) else "N/A"
-        tooltip_html = (
-            f"<b>{t('tooltip_address')}:</b> {row.get('address', 'N/A')} <br/> "
-            f"<b>{t('tooltip_district')}:</b> {row.get('district', 'N/A')} <br/> "
-            f"<b>{t('tooltip_interruptions')}:</b> ⚡ {row['electricity_count']} | 💧 {row['water_count']} <br/> "
-            f"<b>{t('tooltip_latest')}:</b> {last_event_str}"
-        )
+
+    # Vectorized: build tooltip and color columns
+    grouped["color"] = grouped.apply(
+        lambda r: "red" if r["electricity_count"] >= r["water_count"] else "blue", axis=1
+    )
+    grouped["last_event_str"] = grouped["last_event"].dt.strftime('%Y-%m-%d %H:%M:%S').fillna("N/A")
+    lbl_addr = t("tooltip_address")
+    lbl_dist = t("tooltip_district")
+    lbl_intr = t("tooltip_interruptions")
+    lbl_last = t("tooltip_latest")
+    grouped["tooltip"] = (
+        "<b>" + lbl_addr + ":</b> " + grouped["address"].fillna("N/A") + " <br/> "
+        "<b>" + lbl_dist + ":</b> " + grouped["district"].fillna("N/A") + " <br/> "
+        "<b>" + lbl_intr + ":</b> ⚡ " + grouped["electricity_count"].astype(str) +
+        " | 💧 " + grouped["water_count"].astype(str) + " <br/> "
+        "<b>" + lbl_last + ":</b> " + grouped["last_event_str"]
+    )
+
+    # Add markers using vectorized data
+    for lat, lon, color, tooltip in zip(
+        grouped["map_lat"], grouped["map_lon"], grouped["color"], grouped["tooltip"]
+    ):
         folium.CircleMarker(
-            location=[row["map_lat"], row["map_lon"]],
+            location=[lat, lon],
             radius=6,
             color=color,
             fill=True,
             fill_color=color,
             fill_opacity=0.7,
-            tooltip=tooltip_html,
+            tooltip=tooltip,
         ).add_to(m)
-    st_folium(m, width="100%", height=500, returned_objects=[])
+
+    # Render as static HTML — much faster than st_folium on reruns
+    st_html(m._repr_html_(), height=520)
 else:
     st.info(t("map_no_data"))
 

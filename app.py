@@ -406,7 +406,7 @@ with col_chart2:
 st.subheader(t("table_header"))
 cols_to_show = ["event_at", "kind", dist_col, addr_col, "consumer_count", "map_lat", "map_lon"]
 cols_available = [c for c in cols_to_show if c in filtered_df.columns]
-table_df = filtered_df[cols_available].sort_values("event_at", ascending=False).copy()
+table_df = filtered_df[cols_available].sort_values(["event_at", addr_col], ascending=[False, True]).copy()
 table_df["kind"] = table_df["kind"].map(lambda k: kind_label(k))
 col_rename = {
     "event_at": t("col_event_at"),

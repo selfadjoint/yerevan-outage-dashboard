@@ -350,19 +350,24 @@ if not map_data.empty:
         "<b>" + lbl_last + ":</b> " + grouped["last_event_str"]
     )
 
-    # Add markers using vectorized data
-    for lat, lon, color, tooltip in zip(
-        grouped["map_lat"], grouped["map_lon"], grouped["color"], grouped["tooltip"]
-    ):
-        folium.CircleMarker(
-            location=[lat, lon],
-            radius=6,
-            color=color,
-            fill=True,
-            fill_color=color,
-            fill_opacity=0.7,
-            tooltip=tooltip,
-        ).add_to(m)
+    # Cluster markers via FastMarkerCluster — sends a single JSON array
+    # instead of generating one JS object per marker.
+    cluster_data = grouped[["map_lat", "map_lon", "color", "tooltip"]].values.tolist()
+
+    callback = """\
+function (row) {
+    var marker = L.circleMarker(new L.LatLng(row[0], row[1]), {
+        radius: 6,
+        color: row[2],
+        fill: true,
+        fillColor: row[2],
+        fillOpacity: 0.7
+    });
+    marker.bindTooltip(row[3]);
+    return marker;
+}"""
+
+    FastMarkerCluster(data=cluster_data, callback=callback).add_to(m)
 
     # Render as static HTML — much faster than st_folium on reruns
     st_html(m._repr_html_(), height=520)

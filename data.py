@@ -1,7 +1,10 @@
 import pandas as pd
 import streamlit as st
 
-@st.cache_data(ttl=1800)  # Cache DB fetch for 30 minutes
+_CACHE_TTL = 1800  # 15 minutes
+
+
+@st.cache_data(ttl=_CACHE_TTL)
 def fetch_raw_data():
     conn = st.connection("postgresql", type="sql")
     query = """
@@ -14,10 +17,12 @@ def fetch_raw_data():
                                       'Էրեբունի', 'Մալաթիա-Սեբաստիա', 'Նուբարաշեն', 
                                       'Դավթաշեն', 'Շենգավիթ', 'Նորք Մարաշ', 'Արաբկիր', 'Քանաքեռ-Զեյթուն')
     """
-    return conn.query(query)
+    return conn.query(query, ttl=_CACHE_TTL)
 
+
+@st.cache_data(ttl=_CACHE_TTL)
 def get_processed_data() -> pd.DataFrame:
-    df = fetch_raw_data()
+    df = fetch_raw_data().copy()
     
     # Append building to address if available
     has_building = df["building"].notna() & (df["building"].astype(str).str.strip() != "")

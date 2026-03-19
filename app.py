@@ -194,10 +194,11 @@ dist_col = lang_col("district")
 st.sidebar.header(t("filters"))
 
 # Date Filter
-min_date = df["event_at"].min().date()
-max_date = df["event_at"].max().date()
+min_date = "2026-02-19"
+today = pd.Timestamp.now("Asia/Yerevan").date()
+max_date = max(df["event_at"].max().date(), today)
 selected_dates = st.sidebar.date_input(
-    t("date_range"), value=("2026-02-19", max_date), min_value=min_date, max_value=max_date
+    t("date_range"), value=(min_date, max_date), min_value=min_date, max_value=max_date
 )
 
 # Utility Filter — display translated labels, map back to English for filtering

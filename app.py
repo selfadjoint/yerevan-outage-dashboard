@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import folium
 from folium.plugins import FastMarkerCluster
 from streamlit.components.v1 import html as st_html
-from data import get_processed_data
+from data import get_processed_data, MIN_DATE
 
 
 # ---- Translations ---- #
@@ -179,11 +180,6 @@ st.markdown(t("subtitle"))
 with st.spinner(t("loading")):
     df = get_processed_data()
 
-# Prepare event_at
-df["event_at"] = pd.to_datetime(df["event_at"])
-df["event_at"] = df["event_at"].dt.tz_convert("Asia/Yerevan") if df["event_at"].dt.tz is not None else df[
-    "event_at"].dt.tz_localize("UTC").dt.tz_convert("Asia/Yerevan")
-
 # Resolve language-dependent column names
 addr_col = lang_col("address")
 dist_col = lang_col("district")
@@ -194,7 +190,7 @@ dist_col = lang_col("district")
 st.sidebar.header(t("filters"))
 
 # Date Filter
-min_date = "2026-02-19"
+min_date = MIN_DATE
 today = pd.Timestamp.now("Asia/Yerevan").date()
 max_date = max(df["event_at"].max().date(), today)
 selected_dates = st.sidebar.date_input(
@@ -215,13 +211,22 @@ kinds = [kind_display_to_en[lbl] for lbl in selected_kind_labels]
 available_districts = sorted(df[dist_col].dropna().unique().tolist())
 districts = st.sidebar.multiselect(t("district"), options=available_districts)
 
-# Address Filter
-available_addresses = sorted(df[addr_col].dropna().unique().tolist())
-addresses = st.sidebar.multiselect(
+# Address Filter — text search instead of 54K-option multiselect
+address_search = st.sidebar.text_input(
     t("address"),
-    options=available_addresses,
     placeholder=t("address_placeholder"),
 )
+# Scope address matches to already-selected districts (if any)
+if address_search:
+    search_base = df[df[dist_col].isin(districts)][addr_col] if districts else df[addr_col]
+    matching = sorted(search_base[search_base.str.contains(address_search, case=False, na=False)].unique().tolist())
+    addresses = st.sidebar.multiselect(
+        f"🔍 {len(matching)} matches",
+        options=matching[:200],
+        default=matching[:200] if len(matching) <= 10 else [],
+    )
+else:
+    addresses = []
 
 # Apply Filters
 mask = pd.Series(True, index=df.index)
@@ -243,13 +248,16 @@ if addresses:
 
 filtered_df = df[mask]
 
+# Pre-compute kind display column once (reused by charts and table)
+_kind_display_map = {k: kind_label(k) for k in ["Electricity", "Water"]}
+
 # ----------------- #
 #      KPIs         #
 # ----------------- #
 col1, col2, col3, col4 = st.columns(4)
 total_events = len(filtered_df)
-total_electricity = len(filtered_df[filtered_df["kind"] == "Electricity"])
-total_water = len(filtered_df[filtered_df["kind"] == "Water"])
+total_electricity = int(filtered_df["is_elec"].sum())
+total_water = int(filtered_df["is_water"].sum())
 if total_events > 0:
     latest_outage = filtered_df["event_at"].max().strftime('%Y-%m-%d %H:%M:%S')
     top_district = filtered_df[dist_col].mode()
@@ -258,8 +266,8 @@ if total_events > 0:
     if not worst_candidates.empty:
         worst = worst_candidates.groupby(addr_col).agg(
             total=("kind", "count"),
-            elec=("kind", lambda x: (x == "Electricity").sum()),
-            water=("kind", lambda x: (x == "Water").sum()),
+            elec=("is_elec", "sum"),
+            water=("is_water", "sum"),
         ).sort_values("total", ascending=False).iloc[0]
         worst_address = worst.name
         worst_label = f"{int(worst['total'])} {t('times')} (⚡ {int(worst['elec'])} | 💧 {int(worst['water'])})"
@@ -325,18 +333,20 @@ map_data = map_data[(map_data["map_lat"] != 0) & (map_data["map_lon"] != 0)]
 if not map_data.empty:
     m = folium.Map(location=[map_data["map_lat"].mean(), map_data["map_lon"].mean()], zoom_start=11)
     map_data = map_data.sort_values("event_at", ascending=False)
+
+    # Pre-compute boolean columns for vectorized aggregation
     grouped = map_data.groupby(["map_lat", "map_lon"]).agg(
         address=(addr_col, lambda x: "<br/>".join(sorted(set(x.dropna()))[:3]) + (
             "<br/>... and more" if len(set(x.dropna())) > 3 else "")),
         district=(dist_col, "first"),
         last_event=("event_at", "max"),
-        electricity_count=("kind", lambda x: (x == "Electricity").sum()),
-        water_count=("kind", lambda x: (x == "Water").sum()),
+        electricity_count=("is_elec", "sum"),
+        water_count=("is_water", "sum"),
     ).reset_index()
 
-    # Vectorized: build tooltip and color columns
-    grouped["color"] = grouped.apply(
-        lambda r: "red" if r["electricity_count"] >= r["water_count"] else "blue", axis=1
+    # Vectorized color assignment using numpy
+    grouped["color"] = np.where(
+        grouped["electricity_count"] >= grouped["water_count"], "red", "blue"
     )
     grouped["last_event_str"] = grouped["last_event"].dt.strftime('%Y-%m-%d %H:%M:%S').fillna("N/A")
     lbl_addr = t("tooltip_address")
@@ -385,9 +395,11 @@ translated_color_map = {kind_label("Electricity"): "#ff4b4b", kind_label("Water"
 with col_chart1:
     st.subheader(t("chart_by_district"))
     if not filtered_df.empty:
-        chart_df = filtered_df.copy()
-        chart_df["kind_display"] = chart_df["kind"].map(lambda k: kind_label(k))
-        dist_counts = chart_df.groupby([dist_col, "kind_display"]).size().reset_index(name="count")
+        kind_display = filtered_df["kind"].map(_kind_display_map)
+        dist_counts = (
+            pd.DataFrame({dist_col: filtered_df[dist_col], "kind_display": kind_display})
+            .groupby([dist_col, "kind_display"]).size().reset_index(name="count")
+        )
         district_order = dist_counts.groupby(dist_col)["count"].sum().sort_values(ascending=False).index.tolist()
         fig1 = px.bar(
             dist_counts,
@@ -405,10 +417,10 @@ with col_chart1:
 with col_chart2:
     st.subheader(t("chart_trends"))
     if not filtered_df.empty:
-        timeline_df = filtered_df.copy()
-        timeline_df["date"] = timeline_df["event_at"].dt.date
-        timeline_df["kind_display"] = timeline_df["kind"].map(lambda k: kind_label(k))
-        time_counts = timeline_df.groupby(["date", "kind_display"]).size().reset_index(name="count")
+        time_counts = (
+            pd.DataFrame({"date": filtered_df["event_at"].dt.date, "kind_display": filtered_df["kind"].map(_kind_display_map)})
+            .groupby(["date", "kind_display"]).size().reset_index(name="count")
+        )
         fig2 = px.line(
             time_counts,
             x="date",
@@ -428,8 +440,8 @@ with col_chart2:
 st.subheader(t("table_header"))
 cols_to_show = ["event_at", "kind", dist_col, addr_col, "consumer_count", "map_lat", "map_lon"]
 cols_available = [c for c in cols_to_show if c in filtered_df.columns]
-table_df = filtered_df[cols_available].sort_values(["event_at", addr_col], ascending=[False, True]).copy()
-table_df["kind"] = table_df["kind"].map(lambda k: kind_label(k))
+table_df = filtered_df[cols_available].sort_values(["event_at", addr_col], ascending=[False, True]).head(5000)
+table_df = table_df.assign(kind=table_df["kind"].map(_kind_display_map))
 col_rename = {
     "event_at": t("col_event_at"),
     "kind": t("col_kind"),

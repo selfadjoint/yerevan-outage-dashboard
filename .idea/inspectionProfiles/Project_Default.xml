@@ -1,0 +1,58 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="false" level="WARNING" enabled_by_default="false">
+      <option name="ignoredPackages">
+        <list>
+          <option value="apache-airflow-providers-openlineage" />
+          <option value="acryl-datahub-airflow-plugin" />
+          <option value="apache-airflow-providers-amazon" />
+          <option value="apache-airflow-providers-cncf-kubernetes" />
+          <option value="apache-airflow-providers-common-sql" />
+          <option value="apache-airflow-providers-ftp" />
+          <option value="apache-airflow-providers-http" />
+          <option value="apache-airflow-providers-imap" />
+          <option value="apache-airflow-providers-sftp" />
+          <option value="apache-airflow-providers-sqlite" />
+          <option value="apache-airflow-providers-ssh" />
+          <option value="apache-airflow-providers-tableau" />
+          <option value="airflow-clickhouse-plugin" />
+          <option value="boto3" />
+          <option value="botocore" />
+          <option value="croniter" />
+          <option value="GeoAlchemy2" />
+          <option value="gspread" />
+          <option value="gspread-pandas" />
+          <option value="ldap3" />
+          <option value="numpy" />
+          <option value="pandas" />
+          <option value="psycopg2-binary" />
+          <option value="pyarrow" />
+          <option value="pytz" />
+          <option value="python-json-logger" />
+          <option value="pytz-deprecation-shim" />
+          <option value="pytzdata" />
+          <option value="requests" />
+          <option value="shapely" />
+          <option value="slack_sdk" />
+          <option value="SQLAlchemy" />
+          <option value="sqlalchemy-redshift" />
+          <option value="tableauserverclient" />
+          <option value="typing_extensions" />
+          <option value="virtualenv" />
+          <option value="openpyxl" />
+          <option value="cattrs" />
+          <option value="astronomer-cosmos" />
+        </list>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyStubPackagesAdvertiser" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="pandas" />
+          <option value="boto3" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>

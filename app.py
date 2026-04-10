@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import pydeck as pdk
+import folium
+from folium.plugins import FastMarkerCluster
+from streamlit.components.v1 import html as st_html
 from data import get_processed_data, MIN_DATE
 
 
@@ -191,9 +193,8 @@ st.sidebar.header(t("filters"))
 min_date = MIN_DATE
 today = pd.Timestamp.now("Asia/Yerevan").date()
 max_date = max(df["event_at"].max().date(), today)
-default_start = max(today - pd.Timedelta(days=14), pd.Timestamp(min_date).date())
 selected_dates = st.sidebar.date_input(
-    t("date_range"), value=(default_start, max_date), min_value=min_date, max_value=max_date
+    t("date_range"), value=(min_date, max_date), min_value=min_date, max_value=max_date
 )
 
 # Utility Filter — display translated labels, map back to English for filtering
@@ -232,9 +233,9 @@ mask = pd.Series(True, index=df.index)
 
 if len(selected_dates) == 2:
     start_date, end_date = selected_dates
-    mask &= (df["event_date"] >= start_date) & (df["event_date"] <= end_date)
+    mask &= (df["event_at"].dt.date >= start_date) & (df["event_at"].dt.date <= end_date)
 elif len(selected_dates) == 1:
-    mask &= (df["event_date"] == selected_dates[0])
+    mask &= (df["event_at"].dt.date == selected_dates[0])
 
 if kinds:
     mask &= df["kind"].isin(kinds)
@@ -330,72 +331,57 @@ map_data = filtered_df.dropna(subset=["map_lat", "map_lon"])
 map_data = map_data[(map_data["map_lat"] != 0) & (map_data["map_lon"] != 0)]
 
 if not map_data.empty:
-    # --- Fast aggregation (no lambdas) ---
+    m = folium.Map(location=[map_data["map_lat"].mean(), map_data["map_lon"].mean()], zoom_start=11)
+    map_data = map_data.sort_values("event_at", ascending=False)
+
+    # Pre-compute boolean columns for vectorized aggregation
     grouped = map_data.groupby(["map_lat", "map_lon"]).agg(
+        address=(addr_col, lambda x: "<br/>".join(sorted(set(x.dropna()))[:3]) + (
+            "<br/>... and more" if len(set(x.dropna())) > 3 else "")),
         district=(dist_col, "first"),
         last_event=("event_at", "max"),
         electricity_count=("is_elec", "sum"),
         water_count=("is_water", "sum"),
     ).reset_index()
 
-    # Address aggregation: vectorized approach instead of slow lambda
-    addr_unique = map_data[["map_lat", "map_lon", addr_col]].drop_duplicates(subset=["map_lat", "map_lon", addr_col])
-    addr_unique["rank"] = addr_unique.groupby(["map_lat", "map_lon"]).cumcount()
-    addr_counts = addr_unique.groupby(["map_lat", "map_lon"]).size().rename("addr_count")
-    addr_top3 = addr_unique[addr_unique["rank"] < 3]
-    addr_agg = (
-        addr_top3.sort_values(addr_col)
-        .groupby(["map_lat", "map_lon"])[addr_col]
-        .agg("\n".join)
-        .rename("address")
+    # Vectorized color assignment using numpy
+    grouped["color"] = np.where(
+        grouped["electricity_count"] >= grouped["water_count"], "red", "blue"
     )
-    grouped = grouped.merge(addr_agg, on=["map_lat", "map_lon"], how="left")
-    grouped = grouped.merge(addr_counts, on=["map_lat", "map_lon"], how="left")
-    grouped.loc[grouped["addr_count"] > 3, "address"] = grouped["address"] + "\n... and more"
-
-    # Color: red for electricity-dominant, blue for water-dominant
-    grouped["r"] = np.where(grouped["electricity_count"] >= grouped["water_count"], 255, 0).astype(int)
-    grouped["g"] = np.where(grouped["electricity_count"] >= grouped["water_count"], 75, 150).astype(int)
-    grouped["b"] = np.where(grouped["electricity_count"] >= grouped["water_count"], 75, 255).astype(int)
-
-    # Build tooltip text
+    grouped["last_event_str"] = grouped["last_event"].dt.strftime('%Y-%m-%d %H:%M:%S').fillna("N/A")
     lbl_addr = t("tooltip_address")
     lbl_dist = t("tooltip_district")
     lbl_intr = t("tooltip_interruptions")
     lbl_last = t("tooltip_latest")
-    grouped["last_event_str"] = grouped["last_event"].dt.strftime('%Y-%m-%d %H:%M:%S').fillna("N/A")
     grouped["tooltip"] = (
-        lbl_addr + ": " + grouped["address"].fillna("N/A") + "\n"
-        + lbl_dist + ": " + grouped["district"].fillna("N/A") + "\n"
-        + lbl_intr + ": ⚡ " + grouped["electricity_count"].astype(str)
-        + " | 💧 " + grouped["water_count"].astype(str) + "\n"
-        + lbl_last + ": " + grouped["last_event_str"]
+        "<b>" + lbl_addr + ":</b> " + grouped["address"].fillna("N/A") + " <br/> "
+        "<b>" + lbl_dist + ":</b> " + grouped["district"].fillna("N/A") + " <br/> "
+        "<b>" + lbl_intr + ":</b> ⚡ " + grouped["electricity_count"].astype(str) +
+        " | 💧 " + grouped["water_count"].astype(str) + " <br/> "
+        "<b>" + lbl_last + ":</b> " + grouped["last_event_str"]
     )
 
-    # Render with pydeck — GPU-rendered, no HTML serialization
-    layer = pdk.Layer(
-        "ScatterplotLayer",
-        data=grouped,
-        get_position=["map_lon", "map_lat"],
-        get_color=["r", "g", "b", 190],
-        get_radius=60,
-        pickable=True,
-        auto_highlight=True,
-    )
-    view = pdk.ViewState(
-        latitude=float(map_data["map_lat"].mean()),
-        longitude=float(map_data["map_lon"].mean()),
-        zoom=11,
-        pitch=0,
-    )
-    st.pydeck_chart(
-        pdk.Deck(
-            layers=[layer],
-            initial_view_state=view,
-            tooltip={"text": "{tooltip}"},
-        ),
-        height=650,
-    )
+    # Cluster markers via FastMarkerCluster — sends a single JSON array
+    # instead of generating one JS object per marker.
+    cluster_data = grouped[["map_lat", "map_lon", "color", "tooltip"]].values.tolist()
+
+    callback = """\
+function (row) {
+    var marker = L.circleMarker(new L.LatLng(row[0], row[1]), {
+        radius: 6,
+        color: row[2],
+        fill: true,
+        fillColor: row[2],
+        fillOpacity: 0.7
+    });
+    marker.bindTooltip(row[3]);
+    return marker;
+}"""
+
+    FastMarkerCluster(data=cluster_data, callback=callback).add_to(m)
+
+    # Render as static HTML — much faster than st_folium on reruns
+    st_html(m._repr_html_(), height=650)
 else:
     st.info(t("map_no_data"))
 
@@ -432,7 +418,7 @@ with col_chart2:
     st.subheader(t("chart_trends"))
     if not filtered_df.empty:
         time_counts = (
-            pd.DataFrame({"date": filtered_df["event_date"], "kind_display": filtered_df["kind"].map(_kind_display_map)})
+            pd.DataFrame({"date": filtered_df["event_at"].dt.date, "kind_display": filtered_df["kind"].map(_kind_display_map)})
             .groupby(["date", "kind_display"]).size().reset_index(name="count")
         )
         fig2 = px.line(

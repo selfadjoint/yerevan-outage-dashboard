@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Streamlit dashboard for Yerevan utility outages"
 requires-python = ">=3.11"
 dependencies = [
+    "folium>=0.20.0",
     "pandas>=2.3.3",
     "plotly>=6.5.2",
     "psycopg2-binary>=2.9.11",

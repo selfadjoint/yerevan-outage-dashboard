@@ -6,12 +6,9 @@ _CACHE_TTL = 1800  # 30 minutes
 # Earliest date the dashboard shows — also used as SQL filter
 MIN_DATE = "2026-02-19"
 
-# Bump this when cached DataFrame schema changes to force cache invalidation
-_CACHE_VERSION = 3
-
 
 @st.cache_data(ttl=_CACHE_TTL)
-def fetch_raw_data(cache_version: int = _CACHE_VERSION):
+def fetch_raw_data():
     conn = st.connection("postgresql", type="sql")
     query = """
         SELECT
@@ -28,7 +25,7 @@ def fetch_raw_data(cache_version: int = _CACHE_VERSION):
 
 
 @st.cache_data(ttl=_CACHE_TTL)
-def get_processed_data(cache_version: int = _CACHE_VERSION) -> pd.DataFrame:
+def get_processed_data() -> pd.DataFrame:
     df = fetch_raw_data().copy()
 
     # Timezone conversion (done once in cache, not on every rerun)
@@ -48,8 +45,5 @@ def get_processed_data(cache_version: int = _CACHE_VERSION) -> pd.DataFrame:
     # Pre-compute boolean columns for fast aggregation
     df["is_elec"] = df["kind"] == "Electricity"
     df["is_water"] = df["kind"] == "Water"
-
-    # Pre-compute date column for fast filtering
-    df["event_date"] = df["event_at"].dt.date
 
     return df

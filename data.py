@@ -7,7 +7,7 @@ _CACHE_TTL = 1800  # 30 minutes
 MIN_DATE = "2026-02-19"
 
 # Bump this when cached DataFrame schema changes to force cache invalidation
-_CACHE_VERSION = 2
+_CACHE_VERSION = 3
 
 
 @st.cache_data(ttl=_CACHE_TTL)

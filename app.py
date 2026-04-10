@@ -395,7 +395,46 @@ function (row) {
     ).add_to(m)
 
     # Render as static HTML — much faster than st_folium on reruns
-    st_html(m._repr_html_(), height=650)
+    map_html = m._repr_html_()
+    # Folium's _repr_html_() uses a responsive padding-bottom wrapper that
+    # makes the map shorter than the iframe on narrow viewports.  Override it
+    # with CSS so the map always fills the full iframe, then shrink the
+    # Streamlit container on mobile via JS injected into the parent document.
+    _MAP_HEIGHT_DESKTOP = 480
+    _MAP_HEIGHT_MOBILE = 350
+    responsive_wrapper = f"""\
+<style>
+  /* Make folium content fill the entire st_html iframe */
+  html, body {{ margin:0; padding:0; height:100%; overflow:hidden; }}
+  body > div {{ width:100% !important; height:100% !important; }}
+  body > div > div {{
+      position:relative !important;
+      width:100% !important;
+      height:100% !important;
+      padding-bottom:0 !important;
+  }}
+  body > div > div > iframe {{
+      position:absolute; width:100%; height:100%;
+  }}
+</style>
+{map_html}
+<script>
+(function() {{
+    var isMobile = window.innerWidth <= 768;
+    if (!isMobile) return;
+    var h = {_MAP_HEIGHT_MOBILE};
+    var frame = window.frameElement;
+    if (frame) {{
+        var parentDoc = frame.ownerDocument;
+        var style = parentDoc.createElement('style');
+        style.textContent = '.stElementContainer:has(iframe) {{ height: ' + h + 'px !important; flex: 0 0 ' + h + 'px !important; }}';
+        parentDoc.head.appendChild(style);
+        frame.style.setProperty('height', h + 'px', 'important');
+    }}
+}})();
+</script>
+"""
+    st_html(responsive_wrapper, height=_MAP_HEIGHT_DESKTOP)
 else:
     st.info(t("map_no_data"))
 

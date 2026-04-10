@@ -386,7 +386,13 @@ function (row) {
     return marker;
 }"""
 
-    FastMarkerCluster(data=cluster_data, callback=callback).add_to(m)
+    FastMarkerCluster(
+        data=cluster_data,
+        callback=callback,
+        disableClusteringAtZoom=15,
+        maxClusterRadius=40,
+        spiderfyOnMaxZoom=False,
+    ).add_to(m)
 
     # Render as static HTML — much faster than st_folium on reruns
     st_html(m._repr_html_(), height=650)

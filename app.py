@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import folium
+from datetime import timedelta
 from folium.plugins import FastMarkerCluster
 from streamlit.components.v1 import html as st_html
 from data import get_processed_data, MIN_DATE
@@ -196,10 +197,10 @@ dist_col = lang_col("district")
 st.sidebar.header(t("filters"))
 
 # Date Filter
-min_date = MIN_DATE
+min_date = pd.Timestamp(MIN_DATE).date()
 today = pd.Timestamp.now("Asia/Yerevan").date()
 max_date = max(df["event_at"].max().date(), today)
-default_start = max(today - pd.Timedelta(days=30), min_date)
+default_start = max(today - timedelta(days=30), min_date)
 selected_dates = st.sidebar.date_input(
     t("date_range"), value=(default_start, max_date), min_value=min_date, max_value=max_date
 )

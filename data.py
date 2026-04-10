@@ -46,4 +46,7 @@ def get_processed_data() -> pd.DataFrame:
     df["is_elec"] = df["kind"] == "Electricity"
     df["is_water"] = df["kind"] == "Water"
 
+    # Pre-compute date column for fast filtering
+    df["event_date"] = df["event_at"].dt.date
+
     return df

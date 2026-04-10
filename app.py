@@ -193,8 +193,9 @@ st.sidebar.header(t("filters"))
 min_date = MIN_DATE
 today = pd.Timestamp.now("Asia/Yerevan").date()
 max_date = max(df["event_at"].max().date(), today)
+default_start = max(today - pd.Timedelta(days=30), min_date)
 selected_dates = st.sidebar.date_input(
-    t("date_range"), value=(min_date, max_date), min_value=min_date, max_value=max_date
+    t("date_range"), value=(default_start, max_date), min_value=min_date, max_value=max_date
 )
 
 # Utility Filter — display translated labels, map back to English for filtering

@@ -331,6 +331,54 @@ with col4:
     )
 
 # ----------------- #
+#     CHARTS        #
+# ----------------- #
+col_chart1, col_chart2 = st.columns(2)
+# Build translated color map for chart legends
+translated_color_map = {kind_label("Electricity"): "#ff4b4b", kind_label("Water"): "#0096ff"}
+with col_chart1:
+    st.subheader(t("chart_by_district"))
+    if not filtered_df.empty:
+        kind_display = filtered_df["kind"].map(_kind_display_map)
+        dist_counts = (
+            pd.DataFrame({dist_col: filtered_df[dist_col], "kind_display": kind_display})
+            .groupby([dist_col, "kind_display"]).size().reset_index(name="count")
+        )
+        district_order = dist_counts.groupby(dist_col)["count"].sum().sort_values(ascending=False).index.tolist()
+        fig1 = px.bar(
+            dist_counts,
+            x=dist_col,
+            y="count",
+            color="kind_display",
+            category_orders={dist_col: district_order},
+            color_discrete_map=translated_color_map,
+            labels={dist_col: t("district"), "count": t("count_label"), "kind_display": t("utility_type")},
+        )
+        fig1.update_layout(xaxis_tickangle=-45)
+        st.plotly_chart(fig1, use_container_width=True)
+    else:
+        st.write(t("no_data"))
+with col_chart2:
+    st.subheader(t("chart_trends"))
+    if not filtered_df.empty:
+        time_counts = (
+            pd.DataFrame({"date": filtered_df["event_at"].dt.date, "kind_display": filtered_df["kind"].map(_kind_display_map)})
+            .groupby(["date", "kind_display"]).size().reset_index(name="count")
+        )
+        fig2 = px.line(
+            time_counts,
+            x="date",
+            y="count",
+            color="kind_display",
+            color_discrete_map=translated_color_map,
+            labels={"date": t("date"), "count": t("count_label"), "kind_display": t("utility_type")},
+            markers=True,
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+    else:
+        st.write(t("no_data"))
+
+# ----------------- #
 #      MAP          #
 # ----------------- #
 st.subheader(t("map_header"))
@@ -439,57 +487,9 @@ else:
     st.info(t("map_no_data"))
 
 # ----------------- #
-#     CHARTS        #
-# ----------------- #
-st.markdown("---")
-col_chart1, col_chart2 = st.columns(2)
-# Build translated color map for chart legends
-translated_color_map = {kind_label("Electricity"): "#ff4b4b", kind_label("Water"): "#0096ff"}
-with col_chart1:
-    st.subheader(t("chart_by_district"))
-    if not filtered_df.empty:
-        kind_display = filtered_df["kind"].map(_kind_display_map)
-        dist_counts = (
-            pd.DataFrame({dist_col: filtered_df[dist_col], "kind_display": kind_display})
-            .groupby([dist_col, "kind_display"]).size().reset_index(name="count")
-        )
-        district_order = dist_counts.groupby(dist_col)["count"].sum().sort_values(ascending=False).index.tolist()
-        fig1 = px.bar(
-            dist_counts,
-            x=dist_col,
-            y="count",
-            color="kind_display",
-            category_orders={dist_col: district_order},
-            color_discrete_map=translated_color_map,
-            labels={dist_col: t("district"), "count": t("count_label"), "kind_display": t("utility_type")},
-        )
-        fig1.update_layout(xaxis_tickangle=-45)
-        st.plotly_chart(fig1, use_container_width=True)
-    else:
-        st.write(t("no_data"))
-with col_chart2:
-    st.subheader(t("chart_trends"))
-    if not filtered_df.empty:
-        time_counts = (
-            pd.DataFrame({"date": filtered_df["event_at"].dt.date, "kind_display": filtered_df["kind"].map(_kind_display_map)})
-            .groupby(["date", "kind_display"]).size().reset_index(name="count")
-        )
-        fig2 = px.line(
-            time_counts,
-            x="date",
-            y="count",
-            color="kind_display",
-            color_discrete_map=translated_color_map,
-            labels={"date": t("date"), "count": t("count_label"), "kind_display": t("utility_type")},
-            markers=True,
-        )
-        st.plotly_chart(fig2, use_container_width=True)
-    else:
-        st.write(t("no_data"))
-
-# ----------------- #
 #       TABLE       #
 # ----------------- #
+st.markdown("---")
 st.subheader(t("table_header"))
 cols_to_show = ["event_at", "kind", dist_col, addr_col, "consumer_count", "map_lat", "map_lon"]
 cols_available = [c for c in cols_to_show if c in filtered_df.columns]

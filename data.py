@@ -56,15 +56,17 @@ def build_map_groups(map_df: pd.DataFrame, addr_col: str, dist_col: str) -> pd.D
     Cached so the groupby only reruns when the filtered slice actually changes.
     """
     grouped = (
-        map_df.groupby(["map_lat", "map_lon"])
+        map_df.groupby([addr_col])
         .agg(
-            address=(addr_col, "first"),
+            map_lat=("map_lat", "first"),
+            map_lon=("map_lon", "first"),
             district=(dist_col, "first"),
             last_event=("event_at", "max"),
             elec=("is_elec", "sum"),
             water=("is_water", "sum"),
         )
         .reset_index()
+        .rename(columns={addr_col: "address"})
     )
     grouped["total"] = grouped["elec"] + grouped["water"]
     grouped["dominant"] = grouped["elec"].ge(grouped["water"]).map(

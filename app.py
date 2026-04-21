@@ -2,11 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import folium
+import plotly.graph_objects as go
 from datetime import timedelta
-from folium.plugins import FastMarkerCluster
-from streamlit.components.v1 import html as st_html
-from data import get_processed_data, MIN_DATE
+from data import get_processed_data, build_map_groups, MIN_DATE
 
 
 # ---- Translations ---- #
@@ -387,102 +385,69 @@ map_data = filtered_df.dropna(subset=["map_lat", "map_lon"])
 map_data = map_data[(map_data["map_lat"] != 0) & (map_data["map_lon"] != 0)]
 
 if not map_data.empty:
-    m = folium.Map(location=[map_data["map_lat"].mean(), map_data["map_lon"].mean()], zoom_start=11)
-    map_data = map_data.sort_values("event_at", ascending=False)
+    grouped = build_map_groups(map_data, addr_col, dist_col)
 
-    # Pre-compute boolean columns for vectorized aggregation
-    grouped = map_data.groupby(["map_lat", "map_lon"]).agg(
-        address=(addr_col, lambda x: "<br/>".join(sorted(set(x.dropna()))[:3]) + (
-            "<br/>... and more" if len(set(x.dropna())) > 3 else "")),
-        district=(dist_col, "first"),
-        last_event=("event_at", "max"),
-        electricity_count=("is_elec", "sum"),
-        water_count=("is_water", "sum"),
-    ).reset_index()
+    # Translate dominant label for legend
+    grouped["kind_label"] = grouped["dominant"].map(_kind_display_map)
 
-    # Vectorized color assignment using numpy
-    grouped["color"] = np.where(
-        grouped["electricity_count"] >= grouped["water_count"], "red", "blue"
-    )
-    grouped["last_event_str"] = grouped["last_event"].dt.strftime('%Y-%m-%d %H:%M:%S').fillna("N/A")
+    # Point size: sqrt-scaled so hotspots are visible without dominating
+    size_scaled = np.sqrt(grouped["total"].clip(lower=1))
+    grouped["marker_size"] = (size_scaled / size_scaled.max() * 24 + 12).round(1)
+
     lbl_addr = t("tooltip_address")
     lbl_dist = t("tooltip_district")
     lbl_intr = t("tooltip_interruptions")
     lbl_last = t("tooltip_latest")
-    grouped["tooltip"] = (
-        "<b>" + lbl_addr + ":</b> " + grouped["address"].fillna("N/A") + " <br/> "
-        "<b>" + lbl_dist + ":</b> " + grouped["district"].fillna("N/A") + " <br/> "
-        "<b>" + lbl_intr + ":</b> ⚡ " + grouped["electricity_count"].astype(str) +
-        " | 💧 " + grouped["water_count"].astype(str) + " <br/> "
-        "<b>" + lbl_last + ":</b> " + grouped["last_event_str"]
+
+    fig_map = go.Figure()
+    for kind_en, color_hex in [("Electricity", "#ff4b4b"), ("Water", "#0096ff")]:
+        subset = grouped[grouped["dominant"] == kind_en]
+        if subset.empty:
+            continue
+        fig_map.add_trace(go.Scattermap(
+            lat=subset["map_lat"],
+            lon=subset["map_lon"],
+            mode="markers",
+            marker=dict(
+                size=subset["marker_size"],
+                color=color_hex,
+                opacity=0.85,
+                sizemode="diameter",
+            ),
+            cluster=dict(
+                enabled=True,
+                color=color_hex,
+                size=22,
+                step=30,
+                maxzoom=12,
+                opacity=0.9,
+            ),
+            text=subset.apply(
+                lambda r: (
+                    f"<b>{lbl_addr}:</b> {r['address']}<br>"
+                    f"<b>{lbl_dist}:</b> {r['district']}<br>"
+                    f"<b>{lbl_intr}:</b> ⚡ {int(r['elec'])} | 💧 {int(r['water'])}<br>"
+                    f"<b>{lbl_last}:</b> {r['last_event_str']}"
+                ),
+                axis=1,
+            ),
+            hovertemplate="%{text}<extra></extra>",
+            name=kind_label(kind_en),
+        ))
+
+    fig_map.update_layout(
+        map=dict(
+            style="open-street-map",
+            center=dict(lat=map_data["map_lat"].mean(), lon=map_data["map_lon"].mean()),
+            zoom=11,
+        ),
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=480,
+        # legend=dict(orientation="h", yanchor="bottom", y=0.02, xanchor="left", x=0.02,
+        #             bgcolor="rgba(0,0,0,0.4)", font=dict(color="white")),
+        uirevision="map",  # keep pan/zoom across rerenders
     )
-
-    # Cluster markers via FastMarkerCluster — sends a single JSON array
-    # instead of generating one JS object per marker.
-    cluster_data = grouped[["map_lat", "map_lon", "color", "tooltip"]].values.tolist()
-
-    callback = """\
-function (row) {
-    var marker = L.circleMarker(new L.LatLng(row[0], row[1]), {
-        radius: 6,
-        color: row[2],
-        fill: true,
-        fillColor: row[2],
-        fillOpacity: 0.7
-    });
-    marker.bindTooltip(row[3]);
-    return marker;
-}"""
-
-    FastMarkerCluster(
-        data=cluster_data,
-        callback=callback,
-        disableClusteringAtZoom=15,
-        maxClusterRadius=40,
-        spiderfyOnMaxZoom=False,
-    ).add_to(m)
-
-    # Render as static HTML — much faster than st_folium on reruns
-    map_html = m._repr_html_()
-    # Folium's _repr_html_() uses a responsive padding-bottom wrapper that
-    # makes the map shorter than the iframe on narrow viewports.  Override it
-    # with CSS so the map always fills the full iframe, then shrink the
-    # Streamlit container on mobile via JS injected into the parent document.
-    _MAP_HEIGHT_DESKTOP = 480
-    _MAP_HEIGHT_MOBILE = 350
-    responsive_wrapper = f"""\
-<style>
-  /* Make folium content fill the entire st_html iframe */
-  html, body {{ margin:0; padding:0; height:100%; overflow:hidden; }}
-  body > div {{ width:100% !important; height:100% !important; }}
-  body > div > div {{
-      position:relative !important;
-      width:100% !important;
-      height:100% !important;
-      padding-bottom:0 !important;
-  }}
-  body > div > div > iframe {{
-      position:absolute; width:100%; height:100%;
-  }}
-</style>
-{map_html}
-<script>
-(function() {{
-    var isMobile = window.innerWidth <= 768;
-    if (!isMobile) return;
-    var h = {_MAP_HEIGHT_MOBILE};
-    var frame = window.frameElement;
-    if (frame) {{
-        var parentDoc = frame.ownerDocument;
-        var style = parentDoc.createElement('style');
-        style.textContent = '.stElementContainer:has(iframe) {{ height: ' + h + 'px !important; flex: 0 0 ' + h + 'px !important; }}';
-        parentDoc.head.appendChild(style);
-        frame.style.setProperty('height', h + 'px', 'important');
-    }}
-}})();
-</script>
-"""
-    st_html(responsive_wrapper, height=_MAP_HEIGHT_DESKTOP)
+    st.plotly_chart(fig_map, use_container_width=True)
 else:
     st.info(t("map_no_data"))
 

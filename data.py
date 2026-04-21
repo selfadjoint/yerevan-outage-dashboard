@@ -47,3 +47,30 @@ def get_processed_data() -> pd.DataFrame:
     df["is_water"] = df["kind"] == "Water"
 
     return df
+
+
+@st.cache_data(ttl=_CACHE_TTL, show_spinner=False)
+def build_map_groups(map_df: pd.DataFrame, addr_col: str, dist_col: str) -> pd.DataFrame:
+    """One row per unique (lat, lon): aggregated counts + display fields.
+
+    Cached so the groupby only reruns when the filtered slice actually changes.
+    """
+    grouped = (
+        map_df.groupby(["map_lat", "map_lon"])
+        .agg(
+            address=(addr_col, "first"),
+            district=(dist_col, "first"),
+            last_event=("event_at", "max"),
+            elec=("is_elec", "sum"),
+            water=("is_water", "sum"),
+        )
+        .reset_index()
+    )
+    grouped["total"] = grouped["elec"] + grouped["water"]
+    grouped["dominant"] = grouped["elec"].ge(grouped["water"]).map(
+        {True: "Electricity", False: "Water"}
+    )
+    grouped["last_event_str"] = grouped["last_event"].dt.strftime("%Y-%m-%d %H:%M")
+    return grouped
+
+

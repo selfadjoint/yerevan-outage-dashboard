@@ -48,6 +48,7 @@ TRANSLATIONS = {
         "col_lat": "Latitude",
         "col_lon": "Longitude",
         "dominant": "dominant",
+        "period": "Period",
         "disclaimer": "**Data sources:** Electricity outage data from [ENA](https://www.ena.am), water outage data from [Veolia Jur](https://t.me/s/VeoliaJur). "
                        "District and coordinates are obtained via geocoding and may contain inaccuracies. "
                        "This dashboard is provided for informational purposes only — the data is not guaranteed to be 100% accurate or complete.",
@@ -91,6 +92,7 @@ TRANSLATIONS = {
         "col_lat": "\u053c\u0561\u0575\u0576\u0578\u0582\u0569\u0575\u0578\u0582\u0576",
         "col_lon": "\u0535\u0580\u056f\u0561\u0575\u0576\u0578\u0582\u0569\u0575\u0578\u0582\u0576",
         "dominant": "գերակշռող",
+        "period": "\u053a\u0561\u0574\u0561\u0576\u0561\u056f\u0561h\u0561\u057f\u057e\u0561\u056e",
         "disclaimer": "**\u054f\u057e\u0575\u0561\u056c\u0576\u0565\u0580\u056b \u0561\u0572\u0562\u0575\u0578\u0582\u0580\u0576\u0565\u0580\u055d** \u0537\u056c\u0565\u056f\u057f\u0580\u0561\u056f\u0561\u0576\u0578\u0582\u0569\u0575\u0561\u0576 \u0568\u0576\u0564\u0570\u0561\u057f\u0578\u0582\u0574\u0576\u0565\u0580\u056b \u057f\u057e\u0575\u0561\u056c\u0576\u0565\u0580\u0568\u055d [ENA](https://www.ena.am), \u057b\u0580\u0561\u0574\u0561\u057f\u0561\u056f\u0561\u0580\u0561\u0580\u0574\u0561\u0576 \u0568\u0576\u0564\u0570\u0561\u057f\u0578\u0582\u0574\u0576\u0565\u0580\u056b \u057f\u057e\u0575\u0561\u056c\u0576\u0565\u0580\u0568\u055d [\u054e\u0565\u0578\u056c\u056b\u0561 \u054b\u0578\u0582\u0580](https://t.me/s/VeoliaJur): "
                        "\u0539\u0561\u0572\u0561\u0574\u0561\u057d\u0576 \u0578\u0582 \u056f\u0578\u0578\u0580\u0564\u056b\u0576\u0561\u057f\u0576\u0565\u0580\u0568 \u057d\u057f\u0561\u0581\u057e\u0561\u056e \u0565\u0576 \u0563\u0565\u0578\u056f\u0578\u0564\u0561\u057e\u0578\u0580\u0574\u0561\u0576 \u0574\u056b\u057b\u0578\u0581\u0578\u057e \u0587 \u056f\u0561\u0580\u0578\u0572 \u0565\u0576 \u057a\u0561\u0580\u0578\u0582\u0576\u0561\u056f\u0565\u056c \u0561\u0576\u0573\u0577\u057f\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580: "
                        "\u054d\u0578\u0582\u0575\u0576 \u057e\u0561\u0570\u0561\u0576\u0561\u056f\u0568 \u0576\u0561\u056d\u0561\u057f\u0565\u057d\u057e\u0561\u056e \u0567 \u0574\u056b\u0561\u0575\u0576 \u057f\u0565\u0572\u0565\u056f\u0561\u057f\u057e\u0561\u056f\u0561\u0576 \u0576\u057a\u0561\u057f\u0561\u056f\u0576\u0565\u0580\u0578\u057e \u2014 \u057f\u057e\u0575\u0561\u056c\u0576\u0565\u0580\u056b 100% \u0573\u0577\u057f\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0568 \u0587 \u0561\u0574\u0562\u0578\u0572\u057b\u0561\u056f\u0561\u0576\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0568 \u0565\u0580\u0561\u0577\u056d\u0561\u057e\u0578\u0580\u057e\u0561\u056e \u0579\u0567:",
@@ -258,6 +260,16 @@ filtered_df = df[mask]
 
 # Pre-compute kind display column once (reused by charts and table)
 _kind_display_map = {k: kind_label(k) for k in ["Electricity", "Water"]}
+
+# Active date range badge — visible on mobile where sidebar is collapsed
+if len(selected_dates) == 2:
+    _date_str = f"{selected_dates[0].strftime('%b %d, %Y')} – {selected_dates[1].strftime('%b %d, %Y')}"
+elif len(selected_dates) == 1:
+    _date_str = selected_dates[0].strftime('%b %d, %Y')
+else:
+    _date_str = ""
+if _date_str:
+    st.caption(f"📅 {t('period')}: {_date_str}")
 
 # ----------------- #
 #      KPIs         #

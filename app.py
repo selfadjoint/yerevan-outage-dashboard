@@ -484,7 +484,7 @@ col_rename = {
     "map_lon": t("col_lon"),
 }
 table_df = table_df.rename(columns=col_rename)
-st.dataframe(table_df, use_container_width=True)
+st.dataframe(table_df, use_container_width=True, hide_index=True)
 
 # ----------------- #
 #    DISCLAIMER     #

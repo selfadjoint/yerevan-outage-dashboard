@@ -126,14 +126,22 @@ st.set_page_config(page_title="Yerevan Utility Outages", page_icon="\u26a1", lay
 st.markdown(
     """
 <style>
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+    @media (max-width: 768px) {
+        .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    }
     .metric-card {
         background-color: rgba(128, 128, 128, 0.1);
         border: 1px solid rgba(128, 128, 128, 0.2);
         padding: 16px;
         border-radius: 10px;
         text-align: center;
-        margin-bottom: 20px;
-        min-height: 120px;
+        overflow: hidden;
         display: flex;
         flex-direction: column;
         justify-content: flex-start;
@@ -145,16 +153,20 @@ st.markdown(
         opacity: 0.5;
         text-transform: uppercase;
         letter-spacing: 0.06em;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
         width: 100%;
+        flex-shrink: 0;
     }
     .metric-value {
-        font-size: 1.4rem;
+        font-size: 1.3rem;
         font-weight: 700;
         color: #ff4b4b;
         line-height: 1.3;
         width: 100%;
-        word-break: break-word;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
     }
     .metric-detail {
         font-size: 0.82rem;
@@ -163,7 +175,10 @@ st.markdown(
         opacity: 0.6;
         width: 100%;
         margin-top: 5px;
-        word-break: break-word;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex-shrink: 0;
     }
 </style>
 """,
@@ -271,7 +286,6 @@ if _date_str:
 # ----------------- #
 #      KPIs         #
 # ----------------- #
-col1, col2, col3, col4 = st.columns(4)
 total_events = len(filtered_df)
 total_electricity = int(filtered_df["is_elec"].sum())
 total_water = int(filtered_df["is_water"].sum())
@@ -296,48 +310,31 @@ else:
     top_district_name = "N/A"
     worst_address = "N/A"
     worst_label = ""
-with col1:
-    st.markdown(
-        f'''
+st.markdown(
+    f'''
+<div class="kpi-grid">
     <div class="metric-card">
         <div class="metric-label">{t("total_interruptions")}</div>
         <div class="metric-value">{total_events:,}</div>
         <div class="metric-detail">⚡ {total_electricity:,} &nbsp;|&nbsp; 💧 {total_water:,}</div>
     </div>
-    ''',
-        unsafe_allow_html=True,
-    )
-with col2:
-    st.markdown(
-        f'''
     <div class="metric-card">
         <div class="metric-label">{t("latest_interruption")}</div>
         <div class="metric-value">{latest_outage}</div>
     </div>
-    ''',
-        unsafe_allow_html=True,
-    )
-with col3:
-    st.markdown(
-        f'''
     <div class="metric-card">
         <div class="metric-label">{t("most_affected_district")}</div>
         <div class="metric-value">{top_district_name}</div>
     </div>
-    ''',
-        unsafe_allow_html=True,
-    )
-with col4:
-    st.markdown(
-        f'''
     <div class="metric-card">
         <div class="metric-label">{t("worst_location")}</div>
         <div class="metric-value">{worst_address}</div>
         <div class="metric-detail">{worst_label}</div>
     </div>
-    ''',
-        unsafe_allow_html=True,
-    )
+</div>
+''',
+    unsafe_allow_html=True,
+)
 
 # ----------------- #
 #     CHARTS        #

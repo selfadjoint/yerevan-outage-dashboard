@@ -132,9 +132,6 @@ st.markdown(
         gap: 16px;
         margin-bottom: 20px;
     }
-    @media (max-width: 768px) {
-        .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-    }
     .metric-card {
         background-color: rgba(128, 128, 128, 0.1);
         border: 1px solid rgba(128, 128, 128, 0.2);
@@ -158,15 +155,12 @@ st.markdown(
         flex-shrink: 0;
     }
     .metric-value {
-        font-size: 1.3rem;
+        font-size: clamp(0.95rem, 2vw, 1.3rem);
         font-weight: 700;
         color: #ff4b4b;
         line-height: 1.3;
         width: 100%;
-        overflow: hidden;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
+        word-break: break-word;
     }
     .metric-detail {
         font-size: 0.82rem;
@@ -179,6 +173,12 @@ st.markdown(
         overflow: hidden;
         text-overflow: ellipsis;
         flex-shrink: 0;
+    }
+    @media (max-width: 768px) {
+        .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+        .metric-value { font-size: 1rem; }
+        .metric-label { font-size: 0.65rem; }
+        .metric-detail { font-size: 0.75rem; }
     }
 </style>
 """,

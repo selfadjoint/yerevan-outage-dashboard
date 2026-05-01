@@ -133,7 +133,7 @@ st.markdown(
         border-radius: 10px;
         text-align: center;
         margin-bottom: 20px;
-        height: 140px;
+        min-height: 120px;
         display: flex;
         flex-direction: column;
         justify-content: flex-start;
@@ -149,25 +149,21 @@ st.markdown(
         width: 100%;
     }
     .metric-value {
-        font-size: 1.6rem;
+        font-size: 1.4rem;
         font-weight: 700;
         color: #ff4b4b;
-        line-height: 1.2;
-        max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        line-height: 1.3;
+        width: 100%;
+        word-break: break-word;
     }
     .metric-detail {
         font-size: 0.82rem;
         font-weight: 500;
         color: inherit;
         opacity: 0.6;
-        max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        width: 100%;
         margin-top: 5px;
+        word-break: break-word;
     }
 </style>
 """,
